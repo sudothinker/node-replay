@@ -21,6 +21,8 @@ passThrough = (passThrough)->
         agent:    request.agent
         auth:     request.auth
 
+      options.protocol = "https:" if request.url.port is "443"
+      
       http = new HTTP.ClientRequest(options)
       if (request.trailers)
         http.addTrailers(request.trailers)
