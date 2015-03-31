@@ -1,51 +1,53 @@
 HTTP = require("http")
 HTTPS = require("https")
+util = require("util")
+url = require("url")
 
-passThrough = (passThrough)->
+# Capture original HTTP request. PassThrough proxy uses that.
+httpRequest  = HTTP.request
+
+passThrough = (allow)->
   if arguments.length == 0
-    passThrough = -> true
-  else if typeof passThrough == "string"
-    [hostname, passThrough] = [passThrough, (request)-> request.hostname == hostname]
-  else unless typeof passThrough == "function"
-    [boolean, passThrough] = [passThrough, (request)-> !!boolean]
+    allow = -> true
+  else if typeof allow == "string"
+    [hostname, allow] = [allow, (request)-> request.hostname == hostname]
+  else unless typeof allow == "function"
+    [boolean, allow] = [allow, (request)-> !!boolean]
 
   return (request, callback)->
-    if passThrough(request)
+    if allow(request)
       options =
         protocol: request.url.protocol
         hostname: request.url.hostname
         port:     request.url.port
-        path:     request.url.path
+        path:     request.path
         method:   request.method
         headers:  request.headers
-        agent:    request.agent
-        auth:     request.auth
 
-      options.agent = HTTPS.globalAgent if request.url.protocol is "https:"
-      
-      http = new HTTP.ClientRequest(options)
-      if (request.trailers)
-        http.addTrailers(request.trailers)
+      if request.url.protocol == "https:"
+        if util.isString(options)
+          options = url.parse(options)
+        else
+          options = util._extend({},options)
+        options._defaultAgent = HTTPS.globalAgent
+
+      http = httpRequest(options)
       http.on "error", (error)->
         callback error
       http.on "response", (response)->
         captured =
-          version:        response.httpVersion
-          statusCode:     response.statusCode
-          statusMessage:  response.statusMessage
-          headers:        response.headers
-          rawHeaders:     response.rawHeaders
+          version: response.httpVersion
+          status:  response.statusCode
+          headers: response.headers
           body:    []
-        response.on "data", (chunk, encoding)->
-          captured.body.push([chunk, encoding])
+        response.on "data", (chunk)->
+          captured.body.push chunk
         response.on "end", ->
-          captured.trailers     = response.trailers
-          captured.rawTrailers  = response.rawTrailers
+          captured.trailers = response.trailers
           callback null, captured
-
       if request.body
-        for part of request.body
-          http.write(part[0], part[1])
+        for part in request.body
+          http.write part[0], part[1]
       http.end()
     else
       callback null
