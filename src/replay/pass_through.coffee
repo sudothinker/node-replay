@@ -20,13 +20,6 @@ passThrough = (allow)->
         method:   request.method
         headers:  request.headers
 
-      if request.url.protocol == "https:"
-        if util.isString(options)
-          options = url.parse(options)
-        else
-          options = util._extend({},options)
-        options._defaultAgent = HTTPS.globalAgent
-
       http = new ClientRequest(options)
       if (request.trailers)
         http.addTrailers(request.trailers)
