@@ -41,6 +41,9 @@ describe "Pass through", ->
       it "should return response body", ->
         assert.deepEqual response.body, "Success!"
 
+    after ->
+      Replay.mode = "replay"
+
 
     describe "callback", ->
       response = null
@@ -54,7 +57,7 @@ describe "Pass through", ->
           response.on "end", done
         )
         request.on "error", done
-        
+
       it "should return HTTP version", ->
         assert.equal response.httpVersion, "1.1"
       it "should return status code", ->
@@ -66,16 +69,23 @@ describe "Pass through", ->
       it "should return response body", ->
         assert.deepEqual response.body, "Success!"
 
+    after ->
+      Replay.mode = "replay"
 
-  describe.skip "ssl", ->
+
+  describe "ssl", ->
     before ->
-      Replay.passThrough('pass-through')
+      # Make sure we're using passThrough and not just passing request s
+      # through HTTP.request
+      Replay.mode = "bloody"
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = 0
 
     response = null
 
     before (done)->
       options =
         method:   "GET"
+        protocol: "https:"
         hostname: "pass-through"
         port:     HTTPS_PORT
         agent:    false
@@ -85,6 +95,7 @@ describe "Pass through", ->
         response.body = ""
         response.on "data", (chunk)->
           response.body += chunk
+        response.on "end", ->
         response.on "end", done
       )
       request.on("error", done)
@@ -100,6 +111,10 @@ describe "Pass through", ->
       assert.deepEqual response.trailers, { }
     it "should return response body", ->
       assert.deepEqual response.body, "Success!"
+
+    after ->
+      Replay.mode = "replay"
+
 
   # Send request to the live server, but this time network connection disabled.
   describe "replay", ->
